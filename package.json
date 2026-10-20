@@ -1,0 +1,55 @@
+{
+  "name": "@saunos/ndjson-index",
+  "version": "0.1.0",
+  "description": "Stream, batch and index huge NDJSON files in the browser without holding them on the JS heap",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/saunos/ndjson-index"
+  },
+  "keywords": [
+    "ndjson",
+    "jsonl",
+    "stream",
+    "search",
+    "blob",
+    "browser"
+  ],
+  "files": [
+    "dist",
+    "LICENSE",
+    "README.md"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build:lib": "bun build ./src/index.ts --outdir ./dist --target browser --packages external",
+    "build:types": "tsc -p tsconfig.build.json",
+    "build": "rm -rf dist && bun run build:lib && bun run build:types",
+    "docs": "typedoc",
+    "prepublishOnly": "bun run tsc && bun run lint && bun run fmt && bun run test && bun run build",
+    "tsc": "tsc --noEmit",
+    "test": "bun test --coverage",
+    "lint": "oxlint src",
+    "fmt:write": "oxfmt src",
+    "fmt": "oxfmt --check src"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "oxfmt": "^0.67.0",
+    "oxlint": "^1.82.0",
+    "typedoc": "^0.28.20",
+    "typescript": "^5"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

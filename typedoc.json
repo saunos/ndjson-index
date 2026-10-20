@@ -1,0 +1,16 @@
+{
+  "$schema": "https://typedoc.org/schema.json",
+  "entryPoints": ["src/index.ts"],
+  "out": "docs",
+  "name": "@saunos/ndjson-index",
+  "readme": "README.md",
+  "includeVersion": true,
+  "sourceLinkTemplate": "https://github.com/saunos/ndjson-index/blob/{gitRevision}/{path}#L{line}",
+  "excludePrivate": true,
+  "excludeProtected": true,
+  "excludeInternal": true,
+  "navigationLinks": {
+    "GitHub": "https://github.com/saunos/ndjson-index",
+    "npm": "https://www.npmjs.com/package/@saunos/ndjson-index"
+  }
+}
