@@ -1,4 +1,4 @@
-import { NEWLINE } from './bytes';
+import { NEWLINE, concat } from './bytes';
 import { NdjsonError } from './errors';
 import { LineBatcher } from './LineBatcher';
 
@@ -15,6 +15,7 @@ import { LineBatcher } from './LineBatcher';
 export class BoundedLineBatcher {
   private readonly batcher: LineBatcher;
   private seen = 0;
+  private overflow: Uint8Array | null = null;
 
   /**
    * @param byteLength the part's length; it must end on a newline
@@ -33,6 +34,15 @@ export class BoundedLineBatcher {
   }
 
   /**
+   * Bytes pushed past the part's end: the tail of the chunk that crossed it,
+   * plus any chunk pushed once the part was complete. They belong to whatever
+   * follows the part. Null when there are none.
+   */
+  get rest(): Uint8Array | null {
+    return this.overflow;
+  }
+
+  /**
    * Consumes the next chunk.
    *
    * @returns the batches it completed, in order: none, one, or two when the
@@ -42,7 +52,10 @@ export class BoundedLineBatcher {
    *   file, and every line after it would be misattributed
    */
   push(chunk: Uint8Array): Uint8Array<ArrayBuffer>[] {
-    if (this.complete) return [];
+    if (this.complete) {
+      this.keep(chunk);
+      return [];
+    }
     const left = this.byteLength - this.seen;
     if (chunk.byteLength < left) {
       this.seen += chunk.byteLength;
@@ -50,6 +63,7 @@ export class BoundedLineBatcher {
     }
     const head = chunk.subarray(0, left);
     this.seen = this.byteLength;
+    this.keep(chunk.subarray(left));
     if (head[head.byteLength - 1] !== NEWLINE) {
       throw new NdjsonError(
         'not-on-line-boundary',
@@ -59,6 +73,15 @@ export class BoundedLineBatcher {
       );
     }
     return [...present(this.batcher.push(head)), ...present(this.batcher.end())];
+  }
+
+  /** Appends `bytes` to {@link rest}; a view, not a copy, while it is the only one. */
+  private keep(bytes: Uint8Array): void {
+    if (bytes.byteLength === 0) return;
+    this.overflow =
+      this.overflow == null
+        ? bytes
+        : concat([this.overflow, bytes], this.overflow.byteLength + bytes.byteLength);
   }
 
   /**

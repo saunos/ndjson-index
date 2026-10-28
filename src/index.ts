@@ -12,5 +12,6 @@ export { LineBatcher } from './LineBatcher';
 export { BoundedLineBatcher } from './BoundedLineBatcher';
 export { readFirstLine } from './read-first-line';
 export { boundedBatches } from './bounded-batches';
+export { NdjsonStream } from './NdjsonStream';
 export { LineStore, type LineVisitor } from './LineStore';
 export { ByteStringSearchIndex } from './ByteStringSearchIndex';
