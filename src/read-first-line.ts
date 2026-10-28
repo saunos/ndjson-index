@@ -9,6 +9,11 @@ interface ReadFirstLineOptions {
    * in the JS heap before failing.
    */
   maxBytes: number;
+  /**
+   * Bytes already read from `reader` that come before anything it still
+   * yields, such as the `rest` of an earlier read. They are scanned first.
+   */
+  leading?: Uint8Array | null;
 }
 
 /**
@@ -27,14 +32,22 @@ interface ReadFirstLineOptions {
  */
 export async function readFirstLine(
   reader: ReadableStreamDefaultReader<Uint8Array>,
-  { maxBytes }: ReadFirstLineOptions,
+  { maxBytes, leading = null }: ReadFirstLineOptions,
 ): Promise<{ line: string; rest: Uint8Array | null }> {
   const chunks: Uint8Array[] = [];
   let length = 0;
+  let next = leading;
   for (;;) {
-    const { done, value } = await reader.read();
-    if (done) {
-      throw new NdjsonError('no-newline', 'stream ended before line 1 did');
+    let value: Uint8Array;
+    if (next != null) {
+      value = next;
+      next = null;
+    } else {
+      const read = await reader.read();
+      if (read.done) {
+        throw new NdjsonError('no-newline', 'stream ended before line 1 did');
+      }
+      value = read.value;
     }
     const at = value.indexOf(NEWLINE);
     // Checked before keeping the chunk, so at most one chunk past the cap

@@ -49,11 +49,29 @@ const hits = await search.search('иванов'); // ascending line numbers
 const first = JSON.parse(await lines.read(hits[0]));
 ```
 
+When the header declares several parts that are each handled differently,
+there are two ways to read them:
+
+- **A `Blob` or a server that honours `Range`:** give each part its own stream,
+  `blob.slice(start, end).stream()` or a `Range: bytes=start-end-1` request,
+  and read it with `boundedBatches`. Parts can then be read later, or not at
+  all.
+- **One stream, read once:** `NdjsonStream` reads it as consecutive sections
+  and carries the bytes that cross each boundary over to the next one.
+
+```ts
+const src = new NdjsonStream(response.body!, { batchBytes: 8 << 20 });
+const header = JSON.parse(await src.readLine({ maxBytes: 1 << 20 }));
+for await (const batch of src.batches(header.bytes)) processEntries(batch);
+for await (const batch of src.batches()) processRest(batch); // to the end
+```
+
 ## API
 
 | Export | What it does |
 | --- | --- |
-| `readFirstLine(reader, { maxBytes })` | Reads and decodes line 1 only; returns it and the bytes read past it. |
+| `NdjsonStream(stream, { batchBytes })` | One stream as consecutive sections: `readLine({ maxBytes })`, `batches(byteLength)`, `batches()` to the end, `cancel()`. |
+| `readFirstLine(reader, { maxBytes, leading })` | Reads and decodes line 1 only; returns it and the bytes read past it. |
 | `boundedBatches(reader, { byteLength, batchBytes, leading })` | Yields the next `byteLength` bytes as newline-aligned batches, then cancels the reader. |
 | `LineBatcher` / `BoundedLineBatcher` | The synchronous chunk-to-batch cutters behind it. |
 | `LineStore` | Blob-backed line storage: `append(batch, visitor)`, `read(n)`, `length`, `dispose()`. |
