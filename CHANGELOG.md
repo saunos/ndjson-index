@@ -4,6 +4,16 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project
 uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2026-10-31
+
+### Added
+
+- `Utf8KeyIndex`: maps string keys to sequential index numbers (`0, 1, 2, …`)
+  without holding string objects on the JS heap. Stores UTF-8 key bytes, end
+  offsets, 32-bit FNV-1a hashes and an open-addressed hash table in typed
+  arrays (`Uint8Array` and `Int32Array`), with zero-allocation ASCII lookup
+  (`get`, `has`, `add`, `trim`, `size`, `byteLength`).
+
 ## [0.2.0] - 2026-10-28
 
 ### Added
@@ -27,5 +37,6 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `GrowableInt32Array`, `NdjsonError`, `toByteString`, `concat`, `NEWLINE`
   and `yieldToMain`.
 
+[0.3.0]: https://github.com/saunos/ndjson-index/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/saunos/ndjson-index/compare/6941bff...v0.2.0
 [0.1.0]: https://github.com/saunos/ndjson-index/commit/6941bff

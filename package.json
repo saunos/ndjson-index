@@ -1,6 +1,6 @@
 {
   "name": "@saunos/ndjson-index",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Stream, batch and index huge NDJSON files in the browser without holding them on the JS heap",
   "license": "MIT",
   "repository": {
