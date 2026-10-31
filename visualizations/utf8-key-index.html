@@ -1,0 +1,1020 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Utf8KeyIndex — Off-Heap Memory & Lookup Visualizer</title>
+    <style>
+      :root {
+        --bg: #0c0e14;
+        --panel: #131722;
+        --panel-alt: #181d2c;
+        --border: #262e45;
+        --border-bright: #3b486b;
+        --text: #e6edf7;
+        --muted: #8b98b8;
+        --accent: #63b3ed;
+        --accent-glow: rgba(99, 179, 237, 0.2);
+        --amber: #f6ad55;
+        --amber-glow: rgba(246, 173, 85, 0.2);
+        --green: #48bb78;
+        --green-glow: rgba(72, 187, 120, 0.2);
+        --red: #fc8181;
+        --purple: #b794f4;
+        --mono: 'JetBrains Mono', 'Fira Code', 'SF Mono', Menlo, Consolas, monospace;
+        --sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        padding: 28px 32px 60px;
+        background: radial-gradient(circle at 50% 0%, #171e31 0%, var(--bg) 55%);
+        color: var(--text);
+        font-family: var(--sans);
+        line-height: 1.5;
+        min-height: 100vh;
+      }
+
+      header {
+        max-width: 1320px;
+        margin: 0 auto 24px;
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: space-between;
+        align-items: flex-end;
+        gap: 16px;
+        border-bottom: 1px solid var(--border);
+        padding-bottom: 18px;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: 1.65rem;
+        font-weight: 700;
+        letter-spacing: -0.02em;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .badge {
+        font-family: var(--mono);
+        font-size: 0.75rem;
+        font-weight: 600;
+        padding: 3px 9px;
+        border-radius: 999px;
+        background: rgba(99, 179, 237, 0.14);
+        color: var(--accent);
+        border: 1px solid rgba(99, 179, 237, 0.35);
+      }
+
+      .subtitle {
+        margin: 6px 0 0;
+        color: var(--muted);
+        font-size: 0.92rem;
+        max-width: 780px;
+      }
+
+      .stats-bar {
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+
+      .stat-pill {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 8px 14px;
+        display: flex;
+        flex-direction: column;
+        min-width: 118px;
+      }
+
+      .stat-pill span:first-child {
+        font-size: 0.7rem;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--muted);
+      }
+
+      .stat-pill span:last-child {
+        font-family: var(--mono);
+        font-size: 1.05rem;
+        font-weight: 600;
+        color: var(--text);
+      }
+
+      .main-grid {
+        max-width: 1320px;
+        margin: 0 auto;
+        display: grid;
+        grid-template-columns: 380px 1fr;
+        gap: 20px;
+        align-items: start;
+      }
+
+      @media (max-width: 1024px) {
+        .main-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      .card {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 18px 20px;
+        box-shadow: 0 10px 28px rgba(0, 0, 0, 0.32);
+      }
+
+      .card-title {
+        font-size: 0.85rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--muted);
+        margin: 0 0 14px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      .card-title code {
+        font-family: var(--mono);
+        color: var(--accent);
+        text-transform: none;
+        font-size: 0.82rem;
+      }
+
+      .control-section {
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+      }
+
+      .input-row {
+        display: flex;
+        gap: 8px;
+      }
+
+      input[type='text'] {
+        flex: 1;
+        background: #0b0e16;
+        border: 1px solid var(--border-bright);
+        color: var(--text);
+        font-family: var(--mono);
+        font-size: 0.9rem;
+        padding: 9px 12px;
+        border-radius: 7px;
+        outline: none;
+        transition: border-color 0.15s, box-shadow 0.15s;
+      }
+
+      input[type='text']:focus {
+        border-color: var(--accent);
+        box-shadow: 0 0 0 3px var(--accent-glow);
+      }
+
+      button {
+        background: var(--accent);
+        color: #09111e;
+        border: none;
+        font-family: var(--sans);
+        font-weight: 600;
+        font-size: 0.86rem;
+        padding: 9px 14px;
+        border-radius: 7px;
+        cursor: pointer;
+        transition: transform 0.1s, opacity 0.15s, background 0.15s;
+        white-space: nowrap;
+      }
+
+      button:hover {
+        opacity: 0.92;
+      }
+
+      button:active {
+        transform: translateY(1px);
+      }
+
+      button.secondary {
+        background: var(--panel-alt);
+        color: var(--text);
+        border: 1px solid var(--border-bright);
+      }
+
+      button.amber {
+        background: var(--amber);
+        color: #1a1206;
+      }
+
+      .preset-chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+
+      .chip {
+        font-family: var(--mono);
+        font-size: 0.75rem;
+        padding: 4px 9px;
+        border-radius: 6px;
+        background: var(--panel-alt);
+        border: 1px solid var(--border);
+        color: var(--muted);
+        cursor: pointer;
+      }
+
+      .chip:hover {
+        color: var(--text);
+        border-color: var(--accent);
+      }
+
+      .trace-box {
+        background: #0a0d14;
+        border: 1px solid var(--border);
+        border-radius: 9px;
+        padding: 14px;
+        font-family: var(--mono);
+        font-size: 0.8rem;
+        min-height: 220px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      .trace-step {
+        padding: 7px 10px;
+        border-radius: 6px;
+        background: rgba(255, 255, 255, 0.02);
+        border-left: 3px solid var(--border-bright);
+      }
+
+      .trace-step.active {
+        border-left-color: var(--accent);
+        background: rgba(99, 179, 237, 0.08);
+      }
+
+      .trace-step.collision {
+        border-left-color: var(--amber);
+        background: rgba(246, 173, 85, 0.08);
+      }
+
+      .trace-step.hit {
+        border-left-color: var(--green);
+        background: rgba(72, 187, 120, 0.12);
+      }
+
+      .trace-step.miss {
+        border-left-color: var(--red);
+        background: rgba(252, 129, 129, 0.1);
+      }
+
+      .arrays-stack {
+        display: flex;
+        flex-direction: column;
+        gap: 18px;
+      }
+
+      /* Hash Table Grid */
+      .slots-grid {
+        display: grid;
+        grid-template-columns: repeat(8, 1fr);
+        gap: 8px;
+      }
+
+      @media (max-width: 720px) {
+        .slots-grid {
+          grid-template-columns: repeat(4, 1fr);
+        }
+      }
+
+      .slot-cell {
+        background: #0d111a;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 8px 6px;
+        text-align: center;
+        font-family: var(--mono);
+        position: relative;
+        transition: all 0.2s ease;
+      }
+
+      .slot-cell.occupied {
+        background: #141c2e;
+        border-color: #2f3e63;
+      }
+
+      .slot-cell.probe-start {
+        border-color: var(--accent);
+        box-shadow: 0 0 0 2px var(--accent-glow);
+      }
+
+      .slot-cell.probe-collision {
+        border-color: var(--amber);
+        box-shadow: 0 0 0 2px var(--amber-glow);
+      }
+
+      .slot-cell.probe-hit {
+        border-color: var(--green);
+        background: rgba(72, 187, 120, 0.15);
+        box-shadow: 0 0 0 2px var(--green-glow);
+      }
+
+      .slot-cell.probe-miss {
+        border-color: var(--red);
+        background: rgba(252, 129, 129, 0.12);
+      }
+
+      .slot-idx {
+        font-size: 0.68rem;
+        color: var(--muted);
+        display: block;
+      }
+
+      .slot-val {
+        font-size: 1rem;
+        font-weight: 700;
+        margin: 2px 0;
+        display: block;
+      }
+
+      .slot-val.free {
+        color: #424b66;
+        font-weight: 400;
+      }
+
+      .slot-key-preview {
+        font-size: 0.68rem;
+        color: var(--accent);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        display: block;
+      }
+
+      /* Per-index table (hashes + ends) */
+      .index-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-family: var(--mono);
+        font-size: 0.8rem;
+      }
+
+      .index-table th {
+        text-align: left;
+        padding: 7px 10px;
+        color: var(--muted);
+        border-bottom: 1px solid var(--border);
+        font-weight: 600;
+      }
+
+      .index-table td {
+        padding: 7px 10px;
+        border-bottom: 1px solid rgba(38, 46, 69, 0.5);
+      }
+
+      .index-table tr.highlighted {
+        background: rgba(72, 187, 120, 0.14);
+      }
+
+      .index-table tr.compared {
+        background: rgba(246, 173, 85, 0.12);
+      }
+
+      /* Byte Strip */
+      .byte-strip {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px;
+        padding: 6px 0;
+      }
+
+      .byte-box {
+        font-family: var(--mono);
+        width: 34px;
+        padding: 4px 2px;
+        border-radius: 5px;
+        background: #0d111a;
+        border: 1px solid var(--border);
+        text-align: center;
+        display: flex;
+        flex-direction: column;
+        transition: transform 0.15s, border-color 0.15s;
+      }
+
+      .byte-box.active-slice {
+        border-color: var(--green);
+        background: rgba(72, 187, 120, 0.18);
+        transform: translateY(-2px);
+      }
+
+      .byte-box.compared-slice {
+        border-color: var(--amber);
+        background: rgba(246, 173, 85, 0.16);
+      }
+
+      .byte-offset {
+        font-size: 0.58rem;
+        color: var(--muted);
+      }
+
+      .byte-hex {
+        font-size: 0.74rem;
+        font-weight: 600;
+      }
+
+      .byte-char {
+        font-size: 0.68rem;
+        color: var(--accent);
+      }
+
+      .key-color-0 { border-bottom: 3px solid #63b3ed; }
+      .key-color-1 { border-bottom: 3px solid #f6ad55; }
+      .key-color-2 { border-bottom: 3px solid #48bb78; }
+      .key-color-3 { border-bottom: 3px solid #b794f4; }
+      .key-color-4 { border-bottom: 3px solid #f687b3; }
+      .key-color-5 { border-bottom: 3px solid #4fd1c5; }
+
+      .legend {
+        display: flex;
+        gap: 14px;
+        flex-wrap: wrap;
+        font-size: 0.76rem;
+        color: var(--muted);
+        margin-top: 8px;
+      }
+
+      .legend-item {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+
+      .dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 3px;
+      }
+
+      .architecture-note {
+        margin-top: 16px;
+        padding: 12px 14px;
+        border-radius: 8px;
+        background: var(--panel-alt);
+        border: 1px solid var(--border);
+        font-size: 0.82rem;
+        color: var(--muted);
+      }
+
+      .architecture-note strong {
+        color: var(--text);
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div>
+        <h1>
+          Utf8KeyIndex
+          <span class="badge">@saunos/ndjson-index</span>
+        </h1>
+        <p class="subtitle">
+          Interactive visualization of how string keys are packed into a single contiguous
+          <code>Uint8Array</code> and looked up in <em>O(1)</em> via open-addressed linear probing
+          without retaining boxed strings on the JS heap.
+        </p>
+      </div>
+      <div class="stats-bar">
+        <div class="stat-pill">
+          <span>Keys (size)</span>
+          <span id="stat-size">0</span>
+        </div>
+        <div class="stat-pill">
+          <span>UTF-8 Bytes Used</span>
+          <span id="stat-bytes">0 B</span>
+        </div>
+        <div class="stat-pill">
+          <span>Table Slots</span>
+          <span id="stat-slots">16</span>
+        </div>
+        <div class="stat-pill">
+          <span>Load Factor</span>
+          <span id="stat-load">0%</span>
+        </div>
+      </div>
+    </header>
+
+    <div class="main-grid">
+      <!-- Left Column: Controls & Step-by-Step Trace -->
+      <div class="control-section">
+        <div class="card">
+          <div class="card-title">
+            <span>1. Insert Key</span>
+            <code>index.add(key)</code>
+          </div>
+          <div class="input-row">
+            <input
+              id="add-input"
+              type="text"
+              placeholder="e.g. entry-42 or café"
+              value="café"
+            />
+            <button id="add-btn">Add Key</button>
+          </div>
+          <div style="margin-top: 10px">
+            <div style="font-size: 0.74rem; color: var(--muted); margin-bottom: 6px">
+              Quick presets (click to add):
+            </div>
+            <div class="preset-chips">
+              <span class="chip" data-add="alice">alice</span>
+              <span class="chip" data-add="bob">bob</span>
+              <span class="chip" data-add="café">café (UTF-8)</span>
+              <span class="chip" data-add="cafe">cafe (ASCII)</span>
+              <span class="chip" data-add="人名">人名 (3B UTF-8)</span>
+              <span class="chip" data-add="alice">alice (duplicate)</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">
+            <span>2. Lookup Key</span>
+            <code>index.get(key)</code>
+          </div>
+          <div class="input-row">
+            <input
+              id="get-input"
+              type="text"
+              placeholder="Search key..."
+              value="cafe"
+            />
+            <button id="get-btn" class="amber">Lookup</button>
+          </div>
+          <div style="margin-top: 10px; display: flex; gap: 8px">
+            <button id="force-collision-btn" class="secondary" style="flex: 1">
+              Add Colliding Pair
+            </button>
+            <button id="reset-btn" class="secondary">Reset</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">
+            <span>Step-by-Step Execution Trace</span>
+            <code id="trace-op">Ready</code>
+          </div>
+          <div id="trace-box" class="trace-box"></div>
+        </div>
+      </div>
+
+      <!-- Right Column: The 4 Typed Arrays -->
+      <div class="arrays-stack">
+        <!-- 1. Open-Addressing Hash Table -->
+        <div class="card">
+          <div class="card-title">
+            <span>Hash Table Slots (Open Addressing + Linear Probing)</span>
+            <code>table: Int32Array(16) — FREE = -1</code>
+          </div>
+          <div id="slots-grid" class="slots-grid"></div>
+          <div class="legend">
+            <div class="legend-item">
+              <span class="dot" style="background: var(--accent)"></span> Initial Hash Slot
+              (<code>hash &amp; mask</code>)
+            </div>
+            <div class="legend-item">
+              <span class="dot" style="background: var(--amber)"></span> Linear Probe Step
+              (<code>(slot + 1) &amp; mask</code>)
+            </div>
+            <div class="legend-item">
+              <span class="dot" style="background: var(--green)"></span> Match / Target Slot
+            </div>
+            <div class="legend-item">
+              <span class="dot" style="background: var(--red)"></span> Free Slot Reached (Miss)
+            </div>
+          </div>
+        </div>
+
+        <!-- 2. Per-Index Arrays: hashes[] and ends[] -->
+        <div class="card">
+          <div class="card-title">
+            <span>Per-Index Metadata Arrays</span>
+            <code>hashes: Int32Array &amp; ends: Int32Array</code>
+          </div>
+          <div style="overflow-x: auto">
+            <table class="index-table">
+              <thead>
+                <tr>
+                  <th>Index (ord)</th>
+                  <th>Byte Range <code>[start, ends[i])</code></th>
+                  <th>Kept Hash <code>hashes[i]</code> (FNV-1a)</th>
+                  <th>Home Slot <code>hash &amp; mask</code></th>
+                  <th>Decoded Key (for reference)</th>
+                </tr>
+              </thead>
+              <tbody id="index-tbody"></tbody>
+            </table>
+          </div>
+          <div class="architecture-note">
+            <strong>Why keep <code>hashes[i]</code> and <code>ends[i]</code>?</strong>
+            When the hash table doubles in size (at 50% load), <code>grow()</code> re-inserts every
+            index using <code>hashes[i] &amp; newMask</code> without touching <code>bytes</code>. And
+            because keys sit back-to-back with no delimiter, index <code>i</code>'s key is simply
+            <code>bytes.subarray(i === 0 ? 0 : ends[i - 1], ends[i])</code>.
+          </div>
+        </div>
+
+        <!-- 3. Contiguous UTF-8 Byte Buffer -->
+        <div class="card">
+          <div class="card-title">
+            <span>Contiguous UTF-8 Key Buffer</span>
+            <code>bytes: Uint8Array (used: <span id="used-bytes-label">0</span>)</code>
+          </div>
+          <div id="byte-strip" class="byte-strip"></div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      // Visual simulation uses 16 slots (8 max keys before grow) so all slots fit cleanly on screen.
+      const FREE = -1;
+      const FNV_OFFSET = 0x811c9dc5;
+      const FNV_PRIME = 0x01000193;
+      const encoder = new TextEncoder();
+      const decoder = new TextDecoder();
+
+      function hashOf(key) {
+        let hash = FNV_OFFSET;
+        for (let i = 0; i < key.length; i++) {
+          hash = Math.imul(hash ^ key.charCodeAt(i), FNV_PRIME);
+        }
+        return hash | 0;
+      }
+
+      function hex32(n) {
+        return '0x' + (n >>> 0).toString(16).padStart(8, '0');
+      }
+
+      class VisualUtf8KeyIndex {
+        constructor(initialSlots = 16) {
+          this.initialSlots = initialSlots;
+          this.reset();
+        }
+
+        reset() {
+          this.bytes = new Uint8Array(256);
+          this.used = 0;
+          this.ends = new Int32Array(this.initialSlots / 2);
+          this.hashes = new Int32Array(this.initialSlots / 2);
+          this.table = new Int32Array(this.initialSlots).fill(FREE);
+          this.count = 0;
+        }
+
+        keyBytesBounds(index) {
+          const start = index === 0 ? 0 : this.ends[index - 1];
+          const end = this.ends[index];
+          return [start, end];
+        }
+
+        decodeKey(index) {
+          const [start, end] = this.keyBytesBounds(index);
+          return decoder.decode(this.bytes.subarray(start, end));
+        }
+
+        keyEquals(index, key) {
+          const [start, end] = this.keyBytesBounds(index);
+          const encoded = encoder.encode(key);
+          if (end - start !== encoded.length) return false;
+          for (let i = 0; i < encoded.length; i++) {
+            if (this.bytes[start + i] !== encoded[i]) return false;
+          }
+          return true;
+        }
+
+        grow(steps) {
+          const oldLen = this.table.length;
+          const newLen = oldLen * 2;
+          steps.push({
+            type: 'collision',
+            text: `Table reached 50% capacity (${this.count}/${oldLen} slots). Growing table ${oldLen} → ${newLen} slots using kept hashes[i] (no re-hashing).`,
+          });
+          const table = new Int32Array(newLen).fill(FREE);
+          const mask = newLen - 1;
+          for (let i = 0; i < this.count; i++) {
+            let slot = this.hashes[i] & mask;
+            while (table[slot] !== FREE) slot = (slot + 1) & mask;
+            table[slot] = i;
+          }
+          this.table = table;
+          const nextHashes = new Int32Array(newLen / 2);
+          nextHashes.set(this.hashes);
+          this.hashes = nextHashes;
+          const nextEnds = new Int32Array(newLen / 2);
+          nextEnds.set(this.ends);
+          this.ends = nextEnds;
+        }
+
+        addWithTrace(key) {
+          const steps = [];
+          const highlights = {
+            slots: {},
+            activeIndex: null,
+            comparedIndices: [],
+          };
+
+          const index = this.count;
+          if (index === this.hashes.length) {
+            this.grow(steps);
+          }
+
+          const encoded = encoder.encode(key);
+          const hash = hashOf(key);
+          const startByte = this.used;
+          this.bytes.set(encoded, this.used);
+          this.used += encoded.byteLength;
+          this.ends[index] = this.used;
+          this.hashes[index] = hash;
+          this.count++;
+
+          let ascii = true;
+          for (let i = 0; i < key.length; i++) {
+            if (key.charCodeAt(i) >= 0x80) ascii = false;
+          }
+
+          steps.push({
+            type: 'active',
+            text: `1. Assigned index = ${index}. Walked "${key}" (${
+              ascii ? 'fast ASCII copy' : 'UTF-8 encodeInto'
+            }): wrote ${encoded.byteLength}B at bytes[${startByte}..${this.used}), ends[${index}] = ${
+              this.used
+            }.`,
+          });
+
+          const mask = this.table.length - 1;
+          const homeSlot = hash & mask;
+          steps.push({
+            type: 'active',
+            text: `2. FNV-1a hash = ${hex32(hash)} (${hash}). Home slot = hash & ${mask} = ${homeSlot}.`,
+          });
+
+          let slot = homeSlot;
+          let probes = 0;
+          while (true) {
+            const occupant = this.table[slot];
+            if (occupant === FREE) {
+              this.table[slot] = index;
+              highlights.slots[slot] = 'probe-hit';
+              highlights.activeIndex = index;
+              steps.push({
+                type: 'hit',
+                text: `3. Slot ${slot} is FREE (-1). Stored table[${slot}] = ${index}.`,
+              });
+              break;
+            }
+            if (
+              this.hashes[occupant] === hash &&
+              this.keyEquals(occupant, key)
+            ) {
+              this.table[slot] = index;
+              highlights.slots[slot] = 'probe-hit';
+              highlights.activeIndex = index;
+              highlights.comparedIndices.push(occupant);
+              steps.push({
+                type: 'hit',
+                text: `3. Slot ${slot} holds index ${occupant} with identical key "${key}". Overwrote table[${slot}] = ${index} (latest index wins).`,
+              });
+              break;
+            }
+            highlights.slots[slot] = probes === 0 ? 'probe-start' : 'probe-collision';
+            highlights.comparedIndices.push(occupant);
+            steps.push({
+              type: 'collision',
+              text: `Probe #${probes + 1}: Slot ${slot} occupied by index ${occupant} ("${this.decodeKey(
+                occupant
+              )}"). Linear probe → slot ${(slot + 1) & mask}.`,
+            });
+            slot = (slot + 1) & mask;
+            probes++;
+          }
+
+          return { op: `add("${key}") → index ${index}`, steps, highlights };
+        }
+
+        getWithTrace(key) {
+          const steps = [];
+          const highlights = {
+            slots: {},
+            activeIndex: null,
+            comparedIndices: [],
+          };
+
+          const hash = hashOf(key);
+          const mask = this.table.length - 1;
+          const homeSlot = hash & mask;
+
+          steps.push({
+            type: 'active',
+            text: `1. Compute FNV-1a("${key}") = ${hex32(hash)}. Home slot = hash & ${mask} = ${homeSlot}.`,
+          });
+
+          let slot = homeSlot;
+          let probes = 0;
+          while (true) {
+            const ord = this.table[slot];
+            if (ord === FREE) {
+              highlights.slots[slot] = 'probe-miss';
+              steps.push({
+                type: 'miss',
+                text: `2. table[${slot}] is FREE (-1). Stop probing → returns undefined.`,
+              });
+              return { op: `get("${key}") → undefined`, steps, highlights };
+            }
+
+            const storedHash = this.hashes[ord];
+            if (storedHash !== hash) {
+              highlights.slots[slot] = probes === 0 ? 'probe-start' : 'probe-collision';
+              steps.push({
+                type: 'collision',
+                text: `2. table[${slot}] = ${ord}: hashes[${ord}] (${hex32(
+                  storedHash
+                )}) ≠ ${hex32(hash)}. Skip byte check! Linear probe → slot ${(slot + 1) & mask}.`,
+              });
+            } else if (this.keyEquals(ord, key)) {
+              highlights.slots[slot] = 'probe-hit';
+              highlights.activeIndex = ord;
+              const [s, e] = this.keyBytesBounds(ord);
+              steps.push({
+                type: 'hit',
+                text: `2. table[${slot}] = ${ord}: hashes[${ord}] matches (${hex32(
+                  hash
+                )}) AND bytes[${s}..${e}) == "${key}". Returns ${ord}!`,
+              });
+              return { op: `get("${key}") → ${ord}`, steps, highlights };
+            } else {
+              highlights.slots[slot] = probes === 0 ? 'probe-start' : 'probe-collision';
+              highlights.comparedIndices.push(ord);
+              steps.push({
+                type: 'collision',
+                text: `2. table[${slot}] = ${ord}: hash collision, bytes differ. Linear probe → slot ${
+                  (slot + 1) & mask
+                }.`,
+              });
+            }
+
+            slot = (slot + 1) & mask;
+            probes++;
+          }
+        }
+      }
+
+      const model = new VisualUtf8KeyIndex(16);
+
+      function render(traceResult) {
+        document.getElementById('stat-size').textContent = model.count;
+        document.getElementById('stat-bytes').textContent = `${model.used} B`;
+        document.getElementById('stat-slots').textContent = model.table.length;
+        document.getElementById('stat-load').textContent = `${Math.round(
+          (model.count / model.table.length) * 100
+        )}%`;
+        document.getElementById('used-bytes-label').textContent = `${model.used} B`;
+
+        const highlights = traceResult?.highlights ?? {
+          slots: {},
+          activeIndex: null,
+          comparedIndices: [],
+        };
+
+        // 1. Render Hash Table Slots
+        const slotsGrid = document.getElementById('slots-grid');
+        slotsGrid.innerHTML = '';
+        for (let slot = 0; slot < model.table.length; slot++) {
+          const ord = model.table[slot];
+          const cell = document.createElement('div');
+          const highlightClass = highlights.slots[slot] || '';
+          cell.className = `slot-cell ${ord !== FREE ? 'occupied' : ''} ${highlightClass}`;
+          const preview = ord !== FREE ? `"${model.decodeKey(ord)}"` : 'FREE';
+          cell.innerHTML = `
+            <span class="slot-idx">slot ${slot}</span>
+            <span class="slot-val ${ord === FREE ? 'free' : ''}">${ord === FREE ? '-1' : ord}</span>
+            <span class="slot-key-preview">${preview}</span>
+          `;
+          slotsGrid.appendChild(cell);
+        }
+
+        // 2. Render Per-Index Table (hashes & ends)
+        const tbody = document.getElementById('index-tbody');
+        tbody.innerHTML = '';
+        const mask = model.table.length - 1;
+        for (let i = 0; i < model.count; i++) {
+          const tr = document.createElement('tr');
+          if (highlights.activeIndex === i) tr.className = 'highlighted';
+          else if (highlights.comparedIndices.includes(i)) tr.className = 'compared';
+          const [start, end] = model.keyBytesBounds(i);
+          const h = model.hashes[i];
+          tr.innerHTML = `
+            <td><strong>${i}</strong></td>
+            <td><code>[${start}, ${end})</code> (${end - start} B)</td>
+            <td><code>${hex32(h)}</code></td>
+            <td>slot <code>${h & mask}</code></td>
+            <td><code>"${model.decodeKey(i)}"</code></td>
+          `;
+          tbody.appendChild(tr);
+        }
+
+        // 3. Render UTF-8 Byte Strip
+        const byteStrip = document.getElementById('byte-strip');
+        byteStrip.innerHTML = '';
+        for (let i = 0; i < model.count; i++) {
+          const [start, end] = model.keyBytesBounds(i);
+          const isHit = highlights.activeIndex === i;
+          const isCompared = highlights.comparedIndices.includes(i);
+          const colorClass = `key-color-${i % 6}`;
+          for (let b = start; b < end; b++) {
+            const byte = model.bytes[b];
+            const charLabel =
+              byte >= 0x20 && byte < 0x7f ? `'${String.fromCharCode(byte)}'` : 'UTF8';
+            const box = document.createElement('div');
+            box.className = `byte-box ${colorClass} ${
+              isHit ? 'active-slice' : isCompared ? 'compared-slice' : ''
+            }`;
+            box.innerHTML = `
+              <span class="byte-offset">${b}</span>
+              <span class="byte-hex">${byte.toString(16).padStart(2, '0')}</span>
+              <span class="byte-char">${charLabel}</span>
+            `;
+            byteStrip.appendChild(box);
+          }
+        }
+
+        // 4. Render Trace
+        if (traceResult) {
+          document.getElementById('trace-op').textContent = traceResult.op;
+          const traceBox = document.getElementById('trace-box');
+          traceBox.innerHTML = '';
+          for (const step of traceResult.steps) {
+            const div = document.createElement('div');
+            div.className = `trace-step ${step.type}`;
+            div.textContent = step.text;
+            traceBox.appendChild(div);
+          }
+        }
+      }
+
+      // Seed initial state so the diagram is immediately informative
+      model.addWithTrace('alice');
+      model.addWithTrace('café');
+      model.addWithTrace('人名');
+      const initialTrace = model.getWithTrace('café');
+      render(initialTrace);
+
+      // Event Listeners
+      document.getElementById('add-btn').addEventListener('click', () => {
+        const input = document.getElementById('add-input');
+        const res = model.addWithTrace(input.value);
+        render(res);
+      });
+
+      document.getElementById('get-btn').addEventListener('click', () => {
+        const input = document.getElementById('get-input');
+        const res = model.getWithTrace(input.value);
+        render(res);
+      });
+
+      document.querySelectorAll('.chip[data-add]').forEach((chip) => {
+        chip.addEventListener('click', () => {
+          const key = chip.getAttribute('data-add');
+          document.getElementById('add-input').value = key;
+          render(model.addWithTrace(key));
+        });
+      });
+
+      document.getElementById('force-collision-btn').addEventListener('click', () => {
+        // Find two keys that map to the same slot under the current mask
+        const mask = model.table.length - 1;
+        const targetSlot = hashOf('collide-a') & mask;
+        let second = 'collide-b';
+        let n = 1;
+        while ((hashOf(second) & mask) !== targetSlot || second === 'collide-a') {
+          second = `collide-${n++}`;
+        }
+        model.addWithTrace('collide-a');
+        render(model.addWithTrace(second));
+        document.getElementById('get-input').value = second;
+      });
+
+      document.getElementById('reset-btn').addEventListener('click', () => {
+        model.reset();
+        render({
+          op: 'Reset',
+          steps: [{ type: 'active', text: 'Cleared all buffers and reset table to 16 FREE slots.' }],
+          highlights: { slots: {}, activeIndex: null, comparedIndices: [] },
+        });
+      });
+    </script>
+  </body>
+</html>
