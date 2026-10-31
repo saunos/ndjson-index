@@ -76,6 +76,7 @@ for await (const batch of src.batches()) processRest(batch); // to the end
 | `LineBatcher` / `BoundedLineBatcher` | The synchronous chunk-to-batch cutters behind it. |
 | `LineStore` | Blob-backed line storage: `append(batch, visitor)`, `read(n)`, `length`, `dispose()`. |
 | `ByteStringSearchIndex` | Case-insensitive substring index: `append(values)`, `seal()`, `search(needle)`. |
+| `Utf8KeyIndex` | Off-heap string key → index map: `add(key)`, `get(key)`, `trim()`, `size`, `dispose()`. |
 | `GrowableInt32Array` | Push-only `Int32Array` on a resizable `ArrayBuffer`. |
 | `toByteString(bytes)` | Bytes → one-byte-per-char string. |
 | `yieldToMain()` | Yields to the event loop (`scheduler.yield`, else `MessageChannel`). |

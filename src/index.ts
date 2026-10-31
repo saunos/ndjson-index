@@ -15,3 +15,4 @@ export { boundedBatches } from './bounded-batches';
 export { NdjsonStream } from './NdjsonStream';
 export { LineStore, type LineVisitor } from './LineStore';
 export { ByteStringSearchIndex } from './ByteStringSearchIndex';
+export { Utf8KeyIndex } from './Utf8KeyIndex';
